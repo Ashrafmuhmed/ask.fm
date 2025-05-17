@@ -2,6 +2,18 @@
 
 using namespace std ;
 
+template<class t>
+vector<t> split_me(string line){
+    vector<t>ret ; int pos ;
+    while( (pos = (int)line.find(" ")) != -1 ){
+        string sub = line.substr(0,pos);
+        line.erase(0 , pos+1);
+        ret.push_back(sub);
+    }
+    return ret ;
+}
+
+
 struct user{
 
     string username, email, password, id; bool allow_annon;
@@ -18,7 +30,7 @@ struct user{
         cout << "Enter your username, email, password (separated by spaces) : ";
         cin >> _username >> _email >> _password  ;
         cout << "Do you allow annonymous messages ( 1 -> yes | 0 -> no ) :  " ;
-        cin >> allow_annon ;
+        cin >> _allow ;
         if(valid_username(_username)
            && valid_email(_email)
            && valid_password(_password)){
@@ -90,9 +102,31 @@ struct user{
         return true ;
     }
 
+    void extract_data(string line){
+        istringstream iss(line) ;
+        iss >> id >> username >> email >> password >> allow_annon ;
+    }
+
 };
 
 struct question{
+
+    int parent_question_id , question_id , from_id , to_id ; bool annony ;
+    string quest , answer ;
+
+    question(){
+        parent_question_id = question_id = from_id = to_id = annony = 0 ;
+    }
+
+    void read_question(int &_to_id){
+        cout << "Enter your question please (Make it short as possible) : " ;
+        cin >> quest ; to_id = _to_id ;
+    }
+
+    void answer_question(){
+        cout << "Enter the answer please : " ;
+        cin >> answer ;
+    }
 
 };
 
@@ -109,78 +143,165 @@ struct fs_system{
         return data ;
     }
 
-    user search_user(string _name , string _pass)
+    pair<bool,user> search_user(string _name , string _pass)
     {
         vector<user> users ;
         vector<string> data = fetch_data<string>("users.txt") ;
         for( auto&c : data)
         {
-            user u ;
             istringstream iss(c) ;
+            user u ;
             iss >> u.id >> u.username >> u.email >> u.password >> u.allow_annon ;
-            if( u.username == _name && _pass == u.password ) return u ;
+            if( u.username == _name && _pass == u.password ) return make_pair( true , u ) ;
         }
         user u ;
-        return u ;
+        return make_pair( false , u ) ;
     }
 
 };
 
-struct session{
 
-    user current_user ;
+struct ask_system{
 
-    session(){}
+    user loggedin ; fs_system fs ;
 
-    session(user _user)
+    void first_menu(){
+        int choice ;
+        while(true){
+            cout << "Menu :\n 1. Login\n 2.Sign Up\n else.Exit\n Enter your choice : " ;
+            cin >> choice ;
+            if(choice == 1){
+                if(login()){
+                    start_menu();
+                }
+            }else if(choice == 2){
+                signup();
+            }
+            else{
+                break;
+            }
+        }
+    }
+
+    int print_start_menu()
     {
-        current_user = _user ;
+        cout << endl << "Menu" << endl ;
+        cout << "1: Print Questions To Me" << endl ;
+        cout << "2: Print Questions From Me" << endl ;
+        cout << "3: Answer Question"  << endl ;
+        cout << "4: Delete Question" << endl ;
+        cout << "5: Ask Question" << endl ;
+        cout << "6: List system users" << endl ;
+        cout << "7: Feed" << endl ;
+        cout << "8: Logout" << endl << endl  ;
+        cout << "Enter your choice [ 1 - 8 ] : " ;
+        int ch ; cin >> ch ; cout << endl ;
+        return ch ;
     }
 
+    void start_menu()
+    {
+        while(true){
+
+            int ch = print_start_menu();
+
+            if(ch == 1) // 1: Print Questions To Me
+                print_questions_to_me() ;
+            else if(ch == 2) // 2: Print Questions From Me
+                print_questions_from_me() ;
+            else if(ch == 3) // 3: Answer Question
+                answer_question() ;
+            else if(ch == 4) // 4: Delete Question
+                delete_question() ;
+            else if(ch == 5) // 5: Ask Question
+                ask_question() ;
+            else if(ch == 6) // 6: List system users
+                list_system_users() ;
+            else if(ch == 7) // 7: Feed
+                print_feed() ;
+            else if(ch == 8) // 8: Logout
+                break ;
+            else cout << "INVALID INPUT\n";
+
+
+        }
+    }
+
+    bool login(){
+        string name , password ;
+        cout << "Enter username and password : " ;
+        cin >> name >> password ;
+        fs_system fs ;
+        pair<bool,user> auth = fs.search_user(name , password);
+        if(auth.first){
+            loggedin = auth.second ;
+        }
+        return auth.first ;
+    }
+
+    void signup(){
+        user reg_user ;
+        if(reg_user.read_user())
+        {
+            if(reg_user.add_to_fs())
+                cout << "Registered!!" << endl ;
+        }
+    }
+
+    void list_system_users(){
+        vector<string>data = fs.fetch_data<string>("users.txt") ;
+        vector<user>sys_users(data.size()) ;
+        for(int i = 0 ; i < data.size() ; i++){
+            sys_users[i].extract_data(data[i]) ;
+        }
+
+        for(auto&user : sys_users){
+            cout << "User id : " << user.id << ", Username : " << user.username << endl ;
+        }
+    }
+
+    void print_questions_to_me(){
+        cout << "print_questions_to_me\n";
+    }
+
+    void print_questions_from_me()
+    {
+        cout << "print_questions_from_me\n" ;
+    }
+
+    void answer_question()
+    {
+        cout << "answer_question\n" ;
+    }
+
+    void delete_question()
+    {
+        cout << "delete_question\n" ;
+    }
+
+    void ask_question()
+    {
+        cout << "ask_question\n" ;
+    }
+
+    void print_feed()
+    {
+        cout << "print_feed\n" ;
+    }
 };
 
 
-void ask_fm() ;
-void initial_menu();
-void login();
-void signup() ;
 int main()
 {
-    ask_fm();
+    ask_system ask ;
+    ask.first_menu() ;
 }
 
-void ask_fm()
-{
-    while(1) initial_menu() ;
-}
 
-void initial_menu()
-{
-    int choice ;
-    cout << "Menu :\n 1. Login\n 2.Sign Up\n Enter your choice : " ;
-    cin >> choice ;
-    if(choice == 1){
-        login();
-    }else if(choice == 2){
-        signup();
-    }
-}
 
-void login(){
-    string name , password ;
-    cout << "Enter username and password : " ;
-    cin >> name >> password ;
-    fs_system fs ;
-    user current_user = fs.search_user(name , password);
-    cout << "You are currently logged in as " << current_user.username << endl ;
-}
 
-void signup(){
-    user reg_user ;
-    if(reg_user.read_user())
-    {
-        if(reg_user.add_to_fs())
-            cout << "Registered!!" << endl ;
-    }
-}
+
+
+
+
 

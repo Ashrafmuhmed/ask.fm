@@ -1,0 +1,1 @@
+parent_question_id - question_id - from_id - to_id - question - answer
