@@ -34,6 +34,8 @@
 		</Compiler>
 		<Unit filename="ids.txt" />
 		<Unit filename="main.cpp" />
+		<Unit filename="questions.txt" />
+		<Unit filename="questions_ids.txt" />
 		<Unit filename="users.txt" />
 		<Extensions>
 			<lib_finder disable_auto="1" />

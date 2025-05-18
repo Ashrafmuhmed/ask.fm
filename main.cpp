@@ -13,7 +13,6 @@ vector<t> split_me(string line){
     return ret ;
 }
 
-
 struct user{
 
     string username, email, password, id; bool allow_annon;
@@ -112,20 +111,59 @@ struct user{
 struct question{
 
     int parent_question_id , question_id , from_id , to_id ; bool annony ;
-    string quest , answer ;
+    string question_txt = "" , answer_txt = "" ;
 
     question(){
         parent_question_id = question_id = from_id = to_id = annony = 0 ;
     }
 
-    void read_question(int &_to_id){
+    int generate4DigitID() {
+        ifstream in("questions_ids.txt");
+        vector<int>ids ;
+        string id ;
+        while(getline(in , id)){
+            try{
+                ids.push_back(stoi(id));
+            }catch(...){
+                return -1 ;
+            }
+        }
+        int ii ;
+        while(true)
+        {
+            mt19937 rng(std::random_device{}());
+            uniform_int_distribution<int> dist(0, 9999);
+            ii = dist(rng) ;
+            auto i = find(ids.begin(),ids.end(), ii) ;
+            if( i == ids.end()) break ;
+        }
+
+        return ii ;
+
+    }
+
+    print_me(){
+        cout << "Question id (" << question_id << ") " ;
+        if(!annony) cout << "From user("<<from_id<<") \n" ;
+        cout << "Question : " << question_txt << endl ;
+        cout << "Answer : " << ((answer_txt == "")? "Not answered yet" : answer_txt ) << endl<<endl ;
+    }
+
+    void read_question(int _to_id){
         cout << "Enter your question please (Make it short as possible) : " ;
-        cin >> quest ; to_id = _to_id ;
+        cin.ignore() ;
+        getline( cin , question_txt ); to_id = _to_id ; question_id = generate4DigitID() ;
     }
 
     void answer_question(){
         cout << "Enter the answer please : " ;
-        cin >> answer ;
+        cin >> answer_txt ;
+    }
+
+    void extract_data(string &line){
+        //parent_question_id - question_id - from_id - to_id - question - answer
+        istringstream iss(line) ;
+        iss >> parent_question_id >> question_id >> from_id >> to_id >> question_txt >> answer_txt ;
     }
 
 };
@@ -165,6 +203,13 @@ struct ask_system{
 
     user loggedin ; fs_system fs ;
 
+    map< int , vector<int>> thread_questions ;
+
+    map< int , question> id_to_question ;
+
+    vector<user>sys_users ;
+
+
     void first_menu(){
         int choice ;
         while(true){
@@ -183,8 +228,7 @@ struct ask_system{
         }
     }
 
-    int print_start_menu()
-    {
+    int print_start_menu(){
         cout << endl << "Menu" << endl ;
         cout << "1: Print Questions To Me" << endl ;
         cout << "2: Print Questions From Me" << endl ;
@@ -199,8 +243,7 @@ struct ask_system{
         return ch ;
     }
 
-    void start_menu()
-    {
+    void start_menu(){
         while(true){
 
             int ch = print_start_menu();
@@ -250,7 +293,7 @@ struct ask_system{
 
     void list_system_users(){
         vector<string>data = fs.fetch_data<string>("users.txt") ;
-        vector<user>sys_users(data.size()) ;
+        sys_users.resize(data.size());
         for(int i = 0 ; i < data.size() ; i++){
             sys_users[i].extract_data(data[i]) ;
         }
@@ -260,12 +303,52 @@ struct ask_system{
         }
     }
 
-    void print_questions_to_me(){
-        cout << "print_questions_to_me\n";
+    void fetch_questions(){
+        vector<string>ques = fs.fetch_data<string>("questions.txt");
+        vector<question> questions(ques.size()) ;
+        for( int i = 0 ; i < ques.size() ; i++ ){
+            questions[i].extract_data(ques[i]) ;
+        }
+        map_questions(questions) ;
     }
 
-    void print_questions_from_me()
-    {
+    void map_questions(vector<question>&questions){
+        //parent_question_id - question_id - from_id - to_id - question - answer
+        for(auto&q : questions)
+            id_to_question[q.question_id] = q ;
+
+        map_threads();
+    }
+
+    void map_threads(){
+        for(auto[ question_id , questionn ] : id_to_question ){
+            if( questionn.parent_question_id == -1 ){
+                thread_questions[question_id] = { question_id } ;
+            }else{
+                thread_questions[questionn.parent_question_id].push_back(questionn.question_id) ;
+            }
+        }
+    }
+
+    void write_questions(){
+        ofstream out("questions.txt") ;
+        for( auto&[id , questionn] : id_to_question ){
+            out << questionn.parent_question_id << " " << questionn.question_id << " " << questionn.from_id << " " << questionn.to_id << " " << questionn.question_txt << " " << questionn.answer_txt ;
+        }
+    }
+
+    void print_questions_to_me(){
+        for( auto&[ thread_id , questions_id ] : thread_questions ){
+            if( id_to_question[questions_id[0]].to_id == stoi(loggedin.id) ){
+                for( int i = 0 ; i < questions_id.size() ; i++){
+                    if( i != 0 )cout << "Thread : " ;
+                    id_to_question[questions_id[i]].print_me() ;
+                }
+            }
+        }
+    }
+
+    void print_questions_from_me(){
         cout << "print_questions_from_me\n" ;
     }
 
@@ -281,7 +364,30 @@ struct ask_system{
 
     void ask_question()
     {
-        cout << "ask_question\n" ;
+        cout << "Enter user id or -1 to cancel : " ; string ch ; cin >> ch ;
+        auto in = find_if(sys_users.begin() , sys_users.end() ,  [ch](const user& u) { return u.id == ch; } ) ;
+        if( in != sys_users.end() )
+        {
+            int index = in - sys_users.begin() ; user us = sys_users[index] ;
+            if( !us.allow_annon ) cout << "Note : the user doesnt allow annonymus questions\n" ;
+            cout << "For thread questions : Enter question id -1 for new question : "; cin >> ch ;
+            if( ch != "-1" && thread_questions.find(stoi(ch)) == thread_questions.end() ){
+                cout << "Invalid question id.\n" ; return ;
+            }
+            question new_question ;
+            new_question.from_id = ((us.allow_annon) ? -1 : stoi(loggedin.id)) ;
+            new_question.parent_question_id = ((ch == "-1") ? -1 : stoi(ch)) ;
+            new_question.read_question(stoi(us.id)) ;
+
+            id_to_question[new_question.question_id] = new_question ;
+            if( new_question.parent_question_id != -1 ) thread_questions[new_question.parent_question_id].push_back(new_question.question_id) ;
+
+            write_questions();
+
+        }else{
+            cout << "The user id is not found, re write it please\n" ;
+            return ;
+        }
     }
 
     void print_feed()

@@ -1,1 +1,1 @@
-parent_question_id - question_id - from_id - to_id - question - answer
+-1 -1 5520 123 Hello Ashraf, How are you ?  
