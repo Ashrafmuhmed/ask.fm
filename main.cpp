@@ -5,24 +5,26 @@ using namespace std ;
 template<class t>
 vector<t> split_me(string line){
     vector<t>ret ; int pos ;
-    while( (pos = (int)line.find(" ")) != -1 ){
+    while( (pos = (int)line.find(" | ")) != string::npos ){
         string sub = line.substr(0,pos);
-        line.erase(0 , pos+1);
-        ret.push_back(sub);
+        if(!sub.empty())
+            ret.push_back(sub);
+        line.erase(0 , pos+3);
     }
+    if(!line.empty())
+        ret.push_back(line);
     return ret ;
 }
 
 struct user{
 
-    string username, email, password, id; bool allow_annon;
-
+    string username, email, password; bool allow_annon;
+    int id ;
     user(){
         username = email = password = {""}, allow_annon = {0} ;
     }
 
-    bool read_user()
-    {
+    bool read_user(){
 
         string _username , _email , _password ; bool _allow ;
 
@@ -79,8 +81,7 @@ struct user{
         return lh.find('.') != string::npos ;
     }
 
-    bool valid_password(string&_password)
-    {
+    bool valid_password(string&_password){
         bool found_num = false, found_alph = false ;
         for(auto&c : _password)
         {
@@ -91,11 +92,10 @@ struct user{
         return (found_alph && found_num) ;
     }
 
-    bool add_to_fs()
-    {
+    bool add_to_fs(){
         ofstream out_stream("users.txt",ios::app), outstream_ids("ids.txt",ios::app);
         if(!out_stream.is_open()||outstream_ids.fail()) return false ;
-        int id = generate4DigitID() ;
+        id = generate4DigitID() ;
         out_stream<< id << " " << username << " " << email << " " << password << " " << allow_annon <<  endl ;
         outstream_ids << id << endl ;
         return true ;
@@ -105,6 +105,7 @@ struct user{
         istringstream iss(line) ;
         iss >> id >> username >> email >> password >> allow_annon ;
     }
+
 
 };
 
@@ -138,32 +139,36 @@ struct question{
             if( i == ids.end()) break ;
         }
 
+        ofstream oss("questions_ids.txt" , ios::app) ;
+        oss << ii << endl ;
+
         return ii ;
 
     }
 
-    print_me(){
-        cout << "Question id (" << question_id << ") " ;
-        if(!annony) cout << "From user("<<from_id<<") \n" ;
+    void print_me(){
+        cout << "Question id (" << question_id << ") " ; if(!annony) cout << "From user("<<from_id<<")" ;
+        cout << " to user(" << to_id << ")\n" ;
         cout << "Question : " << question_txt << endl ;
-        cout << "Answer : " << ((answer_txt == "")? "Not answered yet" : answer_txt ) << endl<<endl ;
+        cout << "Answer : " << ((answer_txt == "-1")? "Not answered yet" : answer_txt ) << endl<<endl ;
     }
 
     void read_question(int _to_id){
         cout << "Enter your question please (Make it short as possible) : " ;
         cin.ignore() ;
-        getline( cin , question_txt ); to_id = _to_id ; question_id = generate4DigitID() ;
+        getline( cin , question_txt ); to_id = _to_id ; question_id =generate4DigitID() ;
     }
 
     void answer_question(){
         cout << "Enter the answer please : " ;
-        cin >> answer_txt ;
+        getline(cin , answer_txt);
     }
 
     void extract_data(string &line){
         //parent_question_id - question_id - from_id - to_id - question - answer
-        istringstream iss(line) ;
-        iss >> parent_question_id >> question_id >> from_id >> to_id >> question_txt >> answer_txt ;
+        vector<string>data = split_me<string>(line) ;
+        parent_question_id = stoi(data[0]) , question_id = stoi(data[1]) , from_id = stoi(data[2]) , to_id = stoi(data[3]) ;
+        question_txt = data[4] , answer_txt = data[5] ;
     }
 
 };
@@ -229,6 +234,8 @@ struct ask_system{
     }
 
     int print_start_menu(){
+        fetch_users();
+        fetch_questions() ;
         cout << endl << "Menu" << endl ;
         cout << "1: Print Questions To Me" << endl ;
         cout << "2: Print Questions From Me" << endl ;
@@ -292,21 +299,24 @@ struct ask_system{
     }
 
     void list_system_users(){
-        vector<string>data = fs.fetch_data<string>("users.txt") ;
-        sys_users.resize(data.size());
-        for(int i = 0 ; i < data.size() ; i++){
-            sys_users[i].extract_data(data[i]) ;
-        }
-
+        fetch_users();
         for(auto&user : sys_users){
             cout << "User id : " << user.id << ", Username : " << user.username << endl ;
+        }
+    }
+
+    void fetch_users(){
+        vector<string>data = fs.fetch_data<string>("users.txt") ;
+        sys_users.resize(data.size());
+        for(int i = 0 ; i < (int)data.size() ; i++){
+            sys_users[i].extract_data(data[i]) ;
         }
     }
 
     void fetch_questions(){
         vector<string>ques = fs.fetch_data<string>("questions.txt");
         vector<question> questions(ques.size()) ;
-        for( int i = 0 ; i < ques.size() ; i++ ){
+        for( int i = 0 ; i < (int)ques.size() ; i++ ){
             questions[i].extract_data(ques[i]) ;
         }
         map_questions(questions) ;
@@ -320,27 +330,46 @@ struct ask_system{
         map_threads();
     }
 
-    void map_threads(){
+    void map_threads()
+    {
+
+        thread_questions.clear();
         for(auto[ question_id , questionn ] : id_to_question ){
-            if( questionn.parent_question_id == -1 ){
+            if( questionn.parent_question_id == -1 )
                 thread_questions[question_id] = { question_id } ;
-            }else{
-                thread_questions[questionn.parent_question_id].push_back(questionn.question_id) ;
-            }
         }
+        for(auto[ question_id , questionn ] : id_to_question )
+        if( questionn.parent_question_id != -1 )
+            thread_questions[questionn.parent_question_id].push_back(questionn.question_id) ;
+
+
+    }
+
+    void sortIdToQuestionByParentQuestionId() {
+    vector<pair<int, question>> vec(id_to_question.begin(), id_to_question.end());
+    sort(vec.begin(), vec.end(),
+              [](const auto& a, const auto& b) {
+                  return a.second.parent_question_id > b.second.parent_question_id;
+              });
+    id_to_question.clear();
+    for (const auto& pair : vec) {
+        id_to_question[pair.first] = pair.second;
+    }
     }
 
     void write_questions(){
         ofstream out("questions.txt") ;
+        sortIdToQuestionByParentQuestionId();
         for( auto&[id , questionn] : id_to_question ){
-            out << questionn.parent_question_id << " " << questionn.question_id << " " << questionn.from_id << " " << questionn.to_id << " " << questionn.question_txt << " " << questionn.answer_txt ;
+            out << questionn.parent_question_id << " | " << questionn.question_id << " | " << questionn.from_id << " | " << questionn.to_id << " | " << questionn.question_txt << " | " << ((questionn.answer_txt == "") ? "-1" : questionn.answer_txt) ;
+            out<< endl ;
         }
     }
 
     void print_questions_to_me(){
         for( auto&[ thread_id , questions_id ] : thread_questions ){
-            if( id_to_question[questions_id[0]].to_id == stoi(loggedin.id) ){
-                for( int i = 0 ; i < questions_id.size() ; i++){
+            if( id_to_question[questions_id[0]].to_id == loggedin.id ){
+                for( int i = 0 ; i < (int)questions_id.size() ; i++){
                     if( i != 0 )cout << "Thread : " ;
                     id_to_question[questions_id[i]].print_me() ;
                 }
@@ -349,7 +378,13 @@ struct ask_system{
     }
 
     void print_questions_from_me(){
-        cout << "print_questions_from_me\n" ;
+        for( auto&[ thread_id , questions_id ] : thread_questions ){
+            if( id_to_question[questions_id[0]].from_id == loggedin.id ){
+                for( int i = 0 ; i < (int)questions_id.size() ; i++){
+                    id_to_question[questions_id[i]].print_me() ;
+                }
+            }
+        }
     }
 
     void answer_question()
@@ -365,7 +400,7 @@ struct ask_system{
     void ask_question()
     {
         cout << "Enter user id or -1 to cancel : " ; string ch ; cin >> ch ;
-        auto in = find_if(sys_users.begin() , sys_users.end() ,  [ch](const user& u) { return u.id == ch; } ) ;
+        auto in = find_if(sys_users.begin() , sys_users.end() ,  [ch](const user& u) { return u.id == stoi(ch); } ) ;
         if( in != sys_users.end() )
         {
             int index = in - sys_users.begin() ; user us = sys_users[index] ;
@@ -375,24 +410,29 @@ struct ask_system{
                 cout << "Invalid question id.\n" ; return ;
             }
             question new_question ;
-            new_question.from_id = ((us.allow_annon) ? -1 : stoi(loggedin.id)) ;
+            new_question.from_id = ((us.allow_annon) ? -1 : loggedin.id) ;
             new_question.parent_question_id = ((ch == "-1") ? -1 : stoi(ch)) ;
-            new_question.read_question(stoi(us.id)) ;
+            new_question.read_question(us.id) ;
 
             id_to_question[new_question.question_id] = new_question ;
-            if( new_question.parent_question_id != -1 ) thread_questions[new_question.parent_question_id].push_back(new_question.question_id) ;
+            if(new_question.parent_question_id != -1 ) thread_questions[new_question.parent_question_id].push_back(new_question.question_id) ;
 
             write_questions();
 
         }else{
             cout << "The user id is not found, re write it please\n" ;
-            return ;
         }
+        fetch_questions();
     }
 
     void print_feed()
     {
-        cout << "print_feed\n" ;
+        for( auto&[ thread_id , questions ] : thread_questions ){
+            if(questions.size() > 1) cout << "Thread (" << thread_id <<") : ";
+            for(auto&id:questions)
+                id_to_question[id].print_me();
+            cout << "\n--------------------------------------------\n" ;
+        }
     }
 };
 
