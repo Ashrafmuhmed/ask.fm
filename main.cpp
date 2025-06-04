@@ -385,6 +385,8 @@ struct ask_system{
     }
 
     void print_questions_to_me(){
+
+        fetch_questions() ; 
         for( auto&[ thread_id , questions_id ] : thread_questions ){
             if( id_to_question[questions_id[0]].to_id == loggedin.id ){
                 for( int i = 0 ; i < (int)questions_id.size() ; i++){
@@ -394,8 +396,9 @@ struct ask_system{
             }
         }
     }
-
+    
     void print_questions_from_me(){
+        fetch_questions() ; 
         for( auto&[ question_id , question ] : id_to_question ){
             if( question.from_id == loggedin.id ){
                 question.print_me() ;
@@ -423,7 +426,17 @@ struct ask_system{
 
     void delete_question()
     {
-        cout << "delete_question\n" ;
+        cout << "Enter question id, -1 for cancel : " ; string ch ; cin >> ch ; 
+
+        if( ch == "-1" || !is_number(ch[0]) || id_to_question.find(stoi(ch)) == id_to_question.end() )
+            cout << "Invalid input\n" ; 
+        if( id_to_question.at(stoi(ch)).from_id != loggedin.id )   
+            cout << "This question is not from you!\n" ;    
+        
+        id_to_question.erase(stoi(ch)) ; 
+
+        write_questions() ; 
+        
     }
 
     void ask_question()
@@ -452,11 +465,11 @@ struct ask_system{
             if(new_question.parent_question_id != -1 ) thread_questions[new_question.parent_question_id].push_back(new_question.question_id) ;
 
             write_questions();
+            fetch_questions();
 
         }else{
             cout << "The user id is not found, re write it please\n" ;
         }
-        fetch_questions();
     }
 
     void print_feed()
