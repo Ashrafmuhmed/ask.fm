@@ -1,6 +1,6 @@
 /*
     Remaining :
-    - Implement delete question ,
+    - Implement delete question ,(done)
                 delete user , 
                 answer question . (done)
     - Validate user id in ask_question, not to be my id. (done)
