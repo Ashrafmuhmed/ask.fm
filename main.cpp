@@ -1,3 +1,17 @@
+/*
+    Remaining :
+    - Implement delete question ,
+                delete user , 
+                answer question .
+    - Validate user id in ask_question, not to be my id. (done)
+    - check if the question parent id in ask_question is valid. (done)
+    - revise the flow of data between functions, check i there is an more efficient way to do it.
+
+*/
+
+
+
+
 #include<bits/stdc++.h>
 
 using namespace std ;
@@ -156,7 +170,9 @@ struct question{
     void read_question(int _to_id){
         cout << "Enter your question please (Make it short as possible) : " ;
         cin.ignore() ;
-        getline( cin , question_txt ); to_id = _to_id ; question_id =generate4DigitID() ;
+        getline( cin , question_txt ); 
+        to_id = _to_id ; 
+        question_id =generate4DigitID() ;
     }
 
     void answer_question(){
@@ -337,24 +353,21 @@ struct ask_system{
         for(auto[ question_id , questionn ] : id_to_question ){
             if( questionn.parent_question_id == -1 )
                 thread_questions[question_id] = { question_id } ;
+            else thread_questions[questionn.parent_question_id].push_back(questionn.question_id) ;
         }
-        for(auto[ question_id , questionn ] : id_to_question )
-        if( questionn.parent_question_id != -1 )
-            thread_questions[questionn.parent_question_id].push_back(questionn.question_id) ;
-
 
     }
 
     void sortIdToQuestionByParentQuestionId() {
-    vector<pair<int, question>> vec(id_to_question.begin(), id_to_question.end());
-    sort(vec.begin(), vec.end(),
-              [](const auto& a, const auto& b) {
-                  return a.second.parent_question_id > b.second.parent_question_id;
-              });
-    id_to_question.clear();
-    for (const auto& pair : vec) {
-        id_to_question[pair.first] = pair.second;
-    }
+        vector<pair<int, question>> vec(id_to_question.begin(), id_to_question.end());
+        sort(vec.begin(), vec.end(),
+                [](const auto& a, const auto& b) {
+                    return a.second.parent_question_id > b.second.parent_question_id;
+                });
+        id_to_question.clear();
+        for (const auto& pair : vec) {
+            id_to_question[pair.first] = pair.second;
+        }
     }
 
     void write_questions(){
@@ -378,11 +391,9 @@ struct ask_system{
     }
 
     void print_questions_from_me(){
-        for( auto&[ thread_id , questions_id ] : thread_questions ){
-            if( id_to_question[questions_id[0]].from_id == loggedin.id ){
-                for( int i = 0 ; i < (int)questions_id.size() ; i++){
-                    id_to_question[questions_id[i]].print_me() ;
-                }
+        for( auto&[ question_id , question ] : id_to_question ){
+            if( question.from_id == loggedin.id ){
+                question.print_me() ;
             }
         }
     }
@@ -400,15 +411,20 @@ struct ask_system{
     void ask_question()
     {
         cout << "Enter user id or -1 to cancel : " ; string ch ; cin >> ch ;
+        if( stoi(ch) == loggedin.id ) {cout << "Invalid id its ur id !!\n" ;  return ;}
         auto in = find_if(sys_users.begin() , sys_users.end() ,  [ch](const user& u) { return u.id == stoi(ch); } ) ;
         if( in != sys_users.end() )
         {
-            int index = in - sys_users.begin() ; user us = sys_users[index] ;
+            int index = in - sys_users.begin() ;
+            user us = sys_users[index] ;
+            
             if( !us.allow_annon ) cout << "Note : the user doesnt allow annonymus questions\n" ;
             cout << "For thread questions : Enter question id -1 for new question : "; cin >> ch ;
+            
             if( ch != "-1" && thread_questions.find(stoi(ch)) == thread_questions.end() ){
                 cout << "Invalid question id.\n" ; return ;
             }
+
             question new_question ;
             new_question.from_id = ((us.allow_annon) ? -1 : loggedin.id) ;
             new_question.parent_question_id = ((ch == "-1") ? -1 : stoi(ch)) ;
