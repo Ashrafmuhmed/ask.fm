@@ -2,7 +2,7 @@
     Remaining :
     - Implement delete question ,
                 delete user , 
-                answer question .
+                answer question . (done)
     - Validate user id in ask_question, not to be my id. (done)
     - check if the question parent id in ask_question is valid. (done)
     - revise the flow of data between functions, check i there is an more efficient way to do it.
@@ -177,7 +177,9 @@ struct question{
 
     void answer_question(){
         cout << "Enter the answer please : " ;
+        cin.ignore() ;
         getline(cin , answer_txt);
+
     }
 
     void extract_data(string &line){
@@ -230,6 +232,9 @@ struct ask_system{
 
     vector<user>sys_users ;
 
+    bool is_number( char num ){
+        return ( num >= '0' && num <= '9' ) ; 
+    }
 
     void first_menu(){
         int choice ;
@@ -400,7 +405,20 @@ struct ask_system{
 
     void answer_question()
     {
-        cout << "answer_question\n" ;
+        cout << "Enter question id to answer : " ; string ch ; cin >> ch ;
+        if( ch == "-1" || is_number(ch[0]) || id_to_question.find(stoi(ch)) != id_to_question.end() )
+            cout << "Invalid input \n" ; 
+        if( id_to_question.at(stoi(ch)).to_id != loggedin.id )
+            cout << "Invalid question id, it may br not for you !\n" ; 
+        
+        id_to_question.at(stoi(ch)).print_me();
+        
+        if(id_to_question.at(stoi(ch)).answer_txt != "-1") cout << "The question is already answered , you can override it !\n" ; 
+
+        id_to_question.at(stoi(ch)).answer_question() ; 
+
+        write_questions() ; 
+
     }
 
     void delete_question()
